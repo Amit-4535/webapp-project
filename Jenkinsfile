@@ -2,29 +2,31 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "amit4535/webapp"
+        ANSIBLE_HOST = "ubuntu@54.165.114.174" // Ansible server public IP
+        PEM_KEY_PATH = "/var/lib/jenkins/.ssh/kuberneteskey.pem"
+        PLAYBOOK_PATH = "/home/ubuntu/deploy-docker-container.yml"
+        INVENTORY_PATH = "/etc/ansible/hosts"
     }
 
     stages {
-        stage('Clone Repo') {
+        stage('Trigger Ansible Playbook') {
             steps {
-                git 'https://github.com/Amit-4535/webapp-project.git'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                sh 'docker build -t $IMAGE_NAME:latest .'
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
-                    sh 'docker push $IMAGE_NAME:latest'
+                script {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no -i $PEM_KEY_PATH $ANSIBLE_HOST \\
+                    ansible-playbook $PLAYBOOK_PATH -i $INVENTORY_PATH
+                    """
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Playbook executed successfully!'
+        }
+        failure {
+            echo '❌ Playbook execution failed!'
         }
     }
 }
